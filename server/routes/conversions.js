@@ -154,6 +154,18 @@ router.get("/:id/zip", auth.requireRole("admin", "editor"), loadConv, needWork, 
   res.end(out);
 });
 
+// ----- save hand edits to the final HTML (links added in the preview, or typed HTML) -----
+router.put("/:id/final", auth.requireRole("admin", "editor"), loadConv, needWork, async (req, res) => {
+  const conv = req.conv;
+  if (conv.status !== "finalised") return res.status(400).json({ error: "Finalise the email first." });
+  let html = String((req.body || {}).finalHtml || "");
+  if (html.length < 20 || html.length > 2 * 1024 * 1024) return res.status(400).json({ error: "The HTML is empty or too large." });
+  // Emails never need scripts, and this HTML is shown to other users, so drop them.
+  html = html.replace(/<script\b[\s\S]*?<\/script\s*>/gi, "").replace(/<script\b[^>]*>/gi, "");
+  await store.setJSON("conversions", conv.id, { ...conv, finalHtml: html, updatedAt: new Date().toISOString() });
+  res.json({ ok: true, finalHtml: html });
+});
+
 // ----- finalise: swap file names for the hosted URLs the user pasted back -----
 router.post("/:id/finalise", auth.requireRole("admin", "editor"), loadConv, needWork, async (req, res) => {
   const conv = req.conv;

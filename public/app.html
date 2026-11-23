@@ -124,7 +124,7 @@
     <div class="card">
       <h2>Email preview</h2>
       <p class="empty-hint" id="previewEmpty">Run a conversion in step 1, or open one from History.</p>
-      <iframe class="preview" id="previewFrame" title="Email preview"></iframe>
+      <iframe class="preview" id="previewFrame" title="Email preview" sandbox="allow-same-origin"></iframe>
       <div class="actions" data-role="admin editor">
         <button class="btn secondary" id="zipBtn">Download images (zip)</button>
         <button class="btn" id="toStep3Btn">Next: add image links &rarr;</button>
@@ -155,14 +155,24 @@
     <div class="card">
       <h2>Final HTML</h2>
       <div class="notice hidden" id="finalNote"></div>
-      <textarea class="code" id="finalHtml" readonly></textarea>
+
+      <h3>Live preview &amp; link editor</h3>
+      <p class="hint" style="margin:0 0 8px">Click an image or button in the preview to set its link, or highlight text and click <strong>Add link to selection</strong>. Links open in a new tab by default.</p>
+      <div class="actions" style="margin:0 0 10px">
+        <button class="btn secondary" id="addLinkSelBtn" disabled>Add link to selection</button>
+        <button class="btn" id="saveFinalBtn" disabled>Save edits</button>
+        <span class="progress" id="saveFinalStatus"></span>
+      </div>
+      <iframe class="preview tall" id="finalFrame" title="Final preview" sandbox="allow-same-origin"></iframe>
+
+      <h3 style="margin-top:20px">HTML</h3>
+      <textarea class="code" id="finalHtml" spellcheck="false"></textarea>
+      <div class="hint">You can also edit the HTML here; the preview updates as you type. Use <strong>Save edits</strong> to keep your changes.</div>
       <div class="actions">
         <button class="btn" id="copyBtn">Copy</button>
         <button class="btn secondary" id="newConversionBtn">Start a new conversion</button>
         <span class="progress" id="copyStatus"></span>
       </div>
-      <h3 style="margin-top:20px">Live preview</h3>
-      <iframe class="preview" id="finalFrame" title="Final preview"></iframe>
     </div>
   </div>
 </section>
@@ -228,6 +238,7 @@
 </section>
 
 </main>
+<footer class="credit">Vibe coded by: Raymund Niconi</footer>
 
 
 <!-- How-to guide popup (opened from step 3) -->
@@ -253,6 +264,24 @@
     </li>
   </ol>
   <div class="actions"><button type="button" class="btn" id="howToDone">Got it</button></div>
+</dialog>
+
+
+<!-- Link dialog (opened from the Final HTML preview) -->
+<dialog id="linkDialog" class="guide link-dialog" aria-labelledby="linkTitle">
+  <h2 id="linkTitle">Add link</h2>
+  <p class="hint" id="linkWhat" style="margin:0 0 12px"></p>
+  <label for="linkUrl">Link address (URL)</label>
+  <input type="text" id="linkUrl" placeholder="https://example.com/page" autocomplete="off">
+  <label style="display:flex;gap:8px;align-items:center;font-weight:400;margin-top:12px">
+    <input type="checkbox" id="linkNewTab" style="width:auto" checked> Open in a new tab
+  </label>
+  <div class="error hidden" id="linkError"></div>
+  <div class="actions">
+    <button type="button" class="btn" id="linkApply">Apply</button>
+    <button type="button" class="btn secondary" id="linkCancel">Cancel</button>
+    <button type="button" class="btn danger" id="linkRemove" style="margin-left:auto">Remove link</button>
+  </div>
 </dialog>
 
 <script src="js/app.js"></script>

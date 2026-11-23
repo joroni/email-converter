@@ -157,3 +157,11 @@ dialog.guide::backdrop { background: rgba(0,0,0,.5); }
 .guide-steps p { margin: 0 0 10px; line-height: 1.5; }
 .guide-steps img { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; display: block; }
 .guide-steps code, .guide-steps kbd { background: #eef1f5; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+
+/* ---------- Final HTML editor ---------- */
+iframe.preview.tall { height: 560px; }
+dialog.link-dialog { width: min(460px, calc(100vw - 32px)); }
+.save-state { color: #8a6100; }
+
+/* ---------- Small credit line ---------- */
+.credit { text-align: center; font-size: 10px; color: #9aa5b1; opacity: .7; padding: 24px 0 14px; letter-spacing: .02em; }

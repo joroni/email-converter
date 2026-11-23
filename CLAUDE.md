@@ -90,3 +90,127 @@ Conversion flow:
 5. Finalise: parse pasted Pardot Files accordion HTML, extract image URLs, match each to exported images by original file name (Pardot appends extra characters), replace src values, output final HTML.
 
 Keep platform rules pluggable so HubSpot can be added later. Include a README with local setup (netlify dev) and deploy steps.
+
+---
+
+# AS BUILT (current state)
+
+Everything above is the original plan. Prompt 1 (mockup) and Prompt 2 (working app) are DONE and pushed to
+https://github.com/joroni/email-converter (branch `master`). This section records how it is actually built,
+the decisions and gotchas learned along the way, and how to rebuild it. Keep it updated when behaviour changes.
+
+## Stack and conventions
+- Plain HTML/CSS/vanilla JS frontend in `public/` (no framework, no build step). Node 20 + Express 4 backend in `server/`.
+- Express is wrapped as a Netlify Function (`netlify/functions/api.js`, serverless-http). A second function,
+  `netlify/functions/convert-background.js` (the `-background` suffix = 15 min limit), runs the Claude step.
+- Readable, commented code. Passwords hashed with `bcryptjs` (pure JS, no native build on Netlify).
+- Tests: `npm test` (node:test, 11 tests in `test/`). Run them before committing. jsdom is NOT a dependency; browser behaviour
+  was checked with throw-away jsdom scripts (note: jsdom ignores iframe `srcdoc`, so write into `contentDocument` by hand).
+
+## File map
+```
+public/                      login.html, app.html (single page: stepper, history, admin), css/style.css, js/app.js, img/ (How-to screenshots)
+netlify.toml                 publish=public, functions dir, /api/* -> /.netlify/functions/api/:splat, NODE_VERSION=20
+netlify/functions/api.js     Express app via serverless-http (+ connectLambda for Blobs)
+netlify/functions/convert-background.js   verifies HMAC token, calls runConversion(id)
+server/app.js                Express app; mounts router at BOTH /api and /.netlify/functions/api; wraps async handlers
+server/auth.js               bcrypt, signed HttpOnly cookie (ec_session, 12h), requireRole(), seeds first admin from env
+server/store.js              Netlify Blobs wrapper (stores below)
+server/figma.js              parse link, read frame, export image layers, simplified layer tree
+server/ai.js                 generateEmailHtml() = the ONLY AI call; API or local `claude -p` (AI_PROVIDER=cli)
+server/convert.js            runConversion(id): loads data, calls AI, saves html/status
+server/defaults.js           DEFAULT_PROMPT (admin can override in settings)
+server/platforms/            index.js registry; pardot.js, hubspot.js; common.js (URL extraction, name matching, src swapping)
+server/routes/               auth.js, users.js, settings.js, conversions.js
+test/                        api.test.js (in-memory store, roles), matching.test.js, figma.test.js (mocked Figma API)
+```
+
+## Blobs stores (server/store.js)
+`users` (key=username) | `settings` (keys `brands`, `platforms`, `prompt`) | `conversions` (key=id, the record incl. status/html/finalHtml) |
+`frames` (simplified Figma tree) | `images` (`<id>/<file>` + `<id>/_screenshot.png`) | `icons` (brand social icons by file name).
+Conversion status: `processing` -> `ready` (html written) -> `finalised` (finalHtml written) or `error`.
+
+## API (all under /api; roles checked on every route via requireRole)
+- Auth: POST /login, POST /logout, GET /me, POST /me/password.
+- Users (admin): GET/POST /users, PATCH /users/:name (role), POST /users/:name/password, DELETE /users/:name (cannot remove/demote last admin or self).
+- Settings: GET /config (any user: brand names + platforms for dropdowns), GET/PUT /brands, POST /brands/icon, GET /icons/:name,
+  GET/PUT /platforms, GET/PUT /prompt (the last four admin only).
+- Conversions: POST / (admin, editor), GET / (admin all; editor own; viewer finished only), GET /:id (poll target),
+  GET /:id/images/:name, GET /:id/zip (admin/editor), POST /:id/finalise, PUT /:id/final (save hand edits; strips `<script>`).
+- Viewers never receive raw/final HTML or the zip, only `previewHtml`.
+
+## Conversion flow (as implemented)
+1. POST /conversions (60 s function): Figma step (or PNG upload, max 4 MB base64), saves images/frames to Blobs, creates the
+   record with brand + platform-rules SNAPSHOTS, then POSTs to the background function (`DEPLOY_URL || URL || request host`).
+2. Background function: token = HMAC(SESSION_SECRET, "convert:"+id) so only our API can trigger it. Calls `generateEmailHtml`.
+3. Page polls GET /conversions/:id every 3 s (spinner shown) until status changes.
+4. Step 2 shows the preview; images in the preview are served by `/api/conversions/:id/images/:name`.
+5. Finalise (Pardot): paste the Pardot Files accordion HTML; see "Pardot behaviour" below; result stored as finalHtml.
+6. Step 4: link editor + editable HTML; "Save edits" -> PUT /:id/final.
+
+## Image export rules (server/figma.js)
+- Any layer with an image fill is exported as ONE flattened 2x PNG, text/buttons on top included. Reason: overlay text on CSS
+  background images breaks in Outlook and others. Claude is told (server/ai.js) to output a single `<img>` with the layer's text as
+  alt text, wrapped in a link if a button is in it, and NOT to rebuild that text. (We tried "background only + live text": it
+  doubled the text; rejected.)
+- Names: `<email 30 chars>-<section 18 chars>-NN.png`, max ~55 chars (long names get truncated by Pardot). Max 40 image layers.
+- Brand social icons (enabled ones with an uploaded file) are added to the zip and referenced by file name.
+- Screenshot sent to Claude is scaled so no side exceeds ~7500 px (AI limit ~8000).
+
+## Pardot behaviour (hard-won; do not "simplify" without re-testing with a real paste)
+- Pardot rewrites hosted file names: `-` becomes `_`, and the name inside the URL is cut to about 68 characters.
+- The pasted accordion HTML has one `accordion-group` per file, each with the ORIGINAL name (`<h4 class="media-heading">name - <a`,
+  and `"name" was successfully uploaded`) and a `Location: <url>` line. `extractNamedFiles` pairs them exactly; that is the primary match.
+- Fallback matching (`matchImages`): compare names with all separators removed, lower case, no extension; allow appended suffixes;
+  longer names claim first; second pass accepts a URL that is a prefix of our name (>= 20 chars).
+- `swapImageSrcs` replaces file names in `src="..."`, `url(...)` etc.; unmatched names are listed in the UI.
+- If the user re-converts, file names change: the OLD Pardot paste will not match the NEW conversion (re-upload the new zip).
+- HubSpot will behave differently. Each platform module can provide its own `extractImageUrls` / `extractNamedFiles`.
+
+## Frontend (public/js/app.js)
+- Converter is a 4-step stepper: 1 Setup, 2 Preview, 3 Image links, 4 Final HTML. `reached{}` controls which steps are clickable;
+  viewers only get step 2. Role visibility uses `data-role="admin editor"` (class `.hidden`); step visibility uses `.step-panel.current`.
+- Options: source (Figma link / PNG), brand, platform (HubSpot disabled until enabled in Platform rules), "White page background"
+  tickbox (passed to Claude as a layout instruction), notes.
+- Step 3 has a "How to" popup (`<dialog>`) using `public/img/guide-*.png` (Pardot-specific).
+- Step 4 link editor: preview iframe is `sandbox="allow-same-origin"` (no scripts run) so the page can edit its DOM. Click image/link,
+  or select text + "Add link to selection"; dialog sets href, new tab ON by default (`target=_blank rel="noopener noreferrer"`).
+  Edits are serialised back into the textarea (editor-only `<style id="ec-editor-style">` is stripped). Browser serialisation may add
+  `<tbody>` etc. The HTML box is also editable (preview refreshes after 500 ms). Unsaved-edit warnings on leave/new conversion.
+- Admin: users, brands (social rows with URL/on/icon upload), platform rules, Claude prompt. Mobile-friendly hamburger drawer, avatar dropdown.
+
+## Security notes
+- Secrets only in server env vars; browser never sees them. Cookie is HttpOnly + SameSite=Lax (+ Secure on https). User re-loaded
+  from storage each request, so role changes/removals apply immediately.
+- Anything saved by editors is shown to other users, so previews are sandboxed and `<script>` is stripped on save. Keep both.
+- `.env.example` MUST contain blank values only. GitHub push protection blocked a push once because a real Figma token had been
+  put in it (history was rewritten before pushing). Real values go in `.env` (git-ignored). Never put secrets in `public/` (it is served openly).
+
+## Environment variables
+`FIGMA_TOKEN`, `ANTHROPIC_API_KEY`, `SESSION_SECRET` (random 16+ chars), `ADMIN_USERNAME`, `ADMIN_PASSWORD` (seeds the first admin only
+when there are no users). Optional: `AI_PROVIDER=cli` (local `claude -p`, LOCAL DEV ONLY), `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
+- On Netlify the app needs `ANTHROPIC_API_KEY`: the CLI option cannot work there, and users' own Claude Code installs are not reachable.
+
+## Running locally (gotchas)
+- `npm install`, copy `.env.example` to `.env` and fill it, then `npx netlify-cli dev --offline` -> http://localhost:8888.
+  `--offline` is needed here: without it the proxy hung waiting on the Edge Functions setup (this app uses none).
+- Blobs run in a local sandbox under netlify dev. `store.js` only requests "strong" consistency when NOT under netlify dev
+  (`NETLIFY_DEV !== "true"`), because the local blobs context has no `uncachedEdgeURL` (it threw BlobsConsistencyError).
+- Local blob data lives in `.netlify/blobs-serve/` (git-ignored).
+
+## Limits
+~6 MB Netlify request/response bodies (PNG upload 4 MB, zip 5.5 MB); 60 s for regular functions (huge Figma frames may time out);
+background function 15 min; 40 image layers per email; PNG uploads have no layer data (Claude works from the picture only).
+
+## How to rebuild from scratch (order)
+1. Mockup (Prompt 1) -> approve it in the browser. 2. `package.json`, `netlify.toml`. 3. `server/util.js`, `store.js`, `auth.js`,
+`platforms/*`, `defaults.js`. 4. `figma.js`, `ai.js`, `convert.js`. 5. Routes + `app.js`, then the two Netlify function wrappers.
+6. Replace mock data in the frontend with `fetch('/api/...')` calls. 7. Tests (in-memory store for routes; mocked fetch for Figma).
+8. README, `.env.example` (blanks), `.gitignore` (`.env`, `node_modules`, `.netlify`). Then re-apply the lessons in this section
+(flattened images, Pardot pairing, sandboxed previews, consistency flag, `--offline`).
+
+## Future / ideas
+HubSpot support (revisit file naming and finalise parsing); per-platform How-to popup; optional live HTML button below flattened
+hero images (needs a layer-name convention); compress very large exports; deploy to Netlify once `ANTHROPIC_API_KEY` is available.
+
+Built by Raymund Niconi (vibe coded with Claude Code).

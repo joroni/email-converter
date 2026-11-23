@@ -133,6 +133,7 @@ $("stepper").addEventListener("click", (e) => {
 $("toStep3Btn").addEventListener("click", () => setStep(3));
 $("backTo2Btn").addEventListener("click", () => setStep(2));
 $("newConversionBtn").addEventListener("click", () => {
+  if (finalDirty && !confirm("You have unsaved edits. Start a new conversion anyway?")) return;
   resetResults();
   $("figmaLink").value = ""; $("pngFile").value = ""; $("notes").value = ""; $("accordionHtml").value = "";
   setStep(1);
@@ -189,11 +190,25 @@ $("convertBtn").addEventListener("click", async () => {
   }
 });
 
+// Single place that updates the Final HTML box + preview. dirty = has unsaved edits.
+let finalDirty = false;
+function setFinalHtml(html, dirty = false) {
+  $("finalHtml").value = html;
+  $("finalFrame").srcdoc = html;
+  setDirty(dirty);
+}
+function setDirty(d) {
+  finalDirty = d;
+  $("saveFinalBtn").disabled = !d;
+  if (d) { $("saveFinalStatus").innerHTML = '<span class="save-state">Unsaved edits</span>'; }
+  else if ($("saveFinalStatus").textContent === "Unsaved edits") { $("saveFinalStatus").textContent = ""; }
+}
+
 function resetResults() {
   currentId = null;
   reached = me && me.role === "viewer" ? { 2: true } : { 1: true };
   show($("finalNote"), false);
-  $("previewFrame").srcdoc = ""; $("finalFrame").srcdoc = ""; $("finalHtml").value = "";
+  $("previewFrame").srcdoc = ""; setFinalHtml("");
   show($("previewFrame"), false);
   show($("previewEmpty"), true);
   setStep(me && me.role === "viewer" ? 2 : step);
@@ -233,8 +248,7 @@ function showConversion(c) {
   const canWork = me.role !== "viewer";
   reached = { 1: canWork, 2: true, 3: canWork };
   if (c.finalHtml) {
-    $("finalHtml").value = c.finalHtml;
-    $("finalFrame").srcdoc = c.finalHtml;
+    setFinalHtml(c.finalHtml);
     reached[4] = true;
   }
   setStep(c.finalHtml && canWork ? 4 : 2);
@@ -247,8 +261,7 @@ $("finaliseBtn").addEventListener("click", async () => {
   busy($("finaliseStatus"), "Matching image URLs...");
   try {
     const r = await api(`/conversions/${currentId}/finalise`, "POST", { accordionHtml: $("accordionHtml").value });
-    $("finalHtml").value = r.finalHtml;
-    $("finalFrame").srcdoc = r.finalHtml;
+    setFinalHtml(r.finalHtml);
     reached[4] = true;
     setStep(4);
     $("finalNote").textContent = r.unmatched.length
@@ -267,6 +280,180 @@ $("copyBtn").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("finalHtml").value); flash($("copyStatus"), "Copied!"); }
   catch { flash($("copyStatus"), "Copy failed - select the text and copy manually."); }
 });
+
+// ---------- Final HTML: link editor ----------
+// The preview iframe is "sandbox=allow-same-origin" (no scripts run inside it), so this page can
+// safely read and change its DOM. Every change is written back into the HTML box.
+const finalFrame = $("finalFrame");
+const linkDialog = $("linkDialog");
+let savedRange = null;   // last text selection made inside the preview
+let linkJob = null;      // what the open dialog will change: { anchor } | { img } | { range }
+
+// Turn the preview back into HTML text (without our editor-only <style>).
+function serializePreview() {
+  const doc = finalFrame.contentDocument;
+  const clone = doc.documentElement.cloneNode(true);
+  const style = clone.querySelector("#ec-editor-style");
+  if (style) style.remove();
+  const doctype = doc.doctype ? new XMLSerializer().serializeToString(doc.doctype) : "<!DOCTYPE html>";
+  return doctype + "\n" + clone.outerHTML;
+}
+function syncFromPreview() {
+  $("finalHtml").value = serializePreview();
+  savedRange = null;
+  $("addLinkSelBtn").disabled = true;
+  setDirty(true);
+}
+
+// Each time the preview (re)loads: add hover hints and listen for clicks / selections.
+finalFrame.addEventListener("load", () => {
+  const doc = finalFrame.contentDocument;
+  if (!doc || !doc.body || !$("finalHtml").value || me.role === "viewer") return;
+  if (!doc.getElementById("ec-editor-style")) {
+    const st = doc.createElement("style");
+    st.id = "ec-editor-style";
+    st.textContent = "img:hover, a:hover { outline: 2px dashed #1f6feb; outline-offset: 2px; cursor: pointer; }";
+    doc.head.appendChild(st);
+  }
+  doc.addEventListener("click", onPreviewClick, true);
+  doc.addEventListener("mouseup", rememberSelection);
+  doc.addEventListener("keyup", rememberSelection);
+});
+
+function rememberSelection() {
+  const sel = finalFrame.contentDocument.getSelection();
+  savedRange = sel && !sel.isCollapsed && sel.rangeCount && sel.toString().trim() ? sel.getRangeAt(0).cloneRange() : null;
+  $("addLinkSelBtn").disabled = !savedRange;
+}
+
+function onPreviewClick(e) {
+  e.preventDefault(); // never navigate away inside the editor
+  const doc = finalFrame.contentDocument;
+  const sel = doc.getSelection();
+  if (sel && !sel.isCollapsed) return; // the user is selecting text, not clicking
+  const anchor = e.target.closest("a");
+  const img = e.target.closest("img");
+  if (anchor) openLinkDialog({ anchor }, anchor.querySelector("img") ? "image" : "button / link");
+  else if (img) openLinkDialog({ img }, "image");
+}
+
+$("addLinkSelBtn").addEventListener("click", () => {
+  if (!savedRange) return;
+  // If the selection sits inside an existing link, edit that link instead of nesting a new one.
+  const node = savedRange.commonAncestorContainer;
+  const inside = (node.nodeType === 1 ? node : node.parentElement).closest("a");
+  openLinkDialog(inside ? { anchor: inside } : { range: savedRange }, "selected text");
+});
+
+function openLinkDialog(job, what) {
+  linkJob = job;
+  const existing = job.anchor || null;
+  const href = existing ? existing.getAttribute("href") || "" : "";
+  $("linkTitle").textContent = existing ? "Edit link" : "Add link";
+  $("linkWhat").textContent = "Applies to: " + what;
+  $("linkUrl").value = href === "#" ? "" : href;
+  // New tab is the default, also for existing links that have no target yet.
+  $("linkNewTab").checked = existing ? (existing.getAttribute("target") || "_blank") === "_blank" : true;
+  show($("linkRemove"), !!existing);
+  show($("linkError"), false);
+  linkDialog.showModal();
+  $("linkUrl").focus();
+  $("linkUrl").select();
+}
+
+// "example.com" -> "https://example.com". Merge tags (%%tag%%), #, mailto: and tel: are kept as typed.
+function normalizeUrl(raw) {
+  const u = raw.trim();
+  if (!u) throw new Error("Enter a link address.");
+  if (/^(javascript|data|vbscript):/i.test(u)) throw new Error("That kind of link isn't allowed.");
+  if (/^(https?:\/\/|mailto:|tel:|#|%%|\{\{|\/)/i.test(u)) return u;
+  if (/^[\w-]+(\.[\w-]+)+(\/|$|\?|#)/.test(u)) return "https://" + u;
+  throw new Error("Enter a full link such as https://example.com");
+}
+
+function setLinkAttrs(a, url, newTab) {
+  a.setAttribute("href", url);
+  if (newTab) { a.setAttribute("target", "_blank"); a.setAttribute("rel", "noopener noreferrer"); }
+  else { a.removeAttribute("target"); a.removeAttribute("rel"); }
+}
+
+// Wrap the text inside a selection in links (one per text node, so nothing is split awkwardly).
+function linkRange(range, url, newTab) {
+  const doc = finalFrame.contentDocument;
+  const root = range.commonAncestorContainer;
+  const texts = [];
+  if (root.nodeType === 3) texts.push(root);
+  else {
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const n = walker.currentNode;
+      if (range.intersectsNode(n) && n.nodeValue.trim()) texts.push(n);
+    }
+  }
+  texts.forEach((node) => {
+    const existing = node.parentElement.closest("a");
+    if (existing) { setLinkAttrs(existing, url, newTab); return; }
+    const sub = doc.createRange();
+    sub.setStart(node, node === range.startContainer ? range.startOffset : 0);
+    sub.setEnd(node, node === range.endContainer ? range.endOffset : node.nodeValue.length);
+    if (!sub.toString().trim()) return;
+    const a = doc.createElement("a");
+    setLinkAttrs(a, url, newTab);
+    sub.surroundContents(a);
+  });
+}
+
+$("linkApply").addEventListener("click", () => {
+  let url;
+  try { url = normalizeUrl($("linkUrl").value); }
+  catch (err) { $("linkError").textContent = err.message; show($("linkError"), true); return; }
+  const newTab = $("linkNewTab").checked;
+  const doc = finalFrame.contentDocument;
+  if (linkJob.anchor) setLinkAttrs(linkJob.anchor, url, newTab);
+  else if (linkJob.img) {
+    const a = doc.createElement("a");
+    setLinkAttrs(a, url, newTab);
+    linkJob.img.replaceWith(a);
+    a.appendChild(linkJob.img);
+  } else if (linkJob.range) linkRange(linkJob.range, url, newTab);
+  linkDialog.close();
+  syncFromPreview();
+});
+
+$("linkRemove").addEventListener("click", () => {
+  const a = linkJob && linkJob.anchor;
+  if (a) {
+    while (a.firstChild) a.parentNode.insertBefore(a.firstChild, a);
+    a.remove();
+    syncFromPreview();
+  }
+  linkDialog.close();
+});
+$("linkCancel").addEventListener("click", () => linkDialog.close());
+$("linkUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("linkApply").click(); } });
+
+// Typing in the HTML box updates the preview (after a short pause).
+let htmlTimer;
+$("finalHtml").addEventListener("input", () => {
+  clearTimeout(htmlTimer);
+  setDirty(true);
+  htmlTimer = setTimeout(() => { finalFrame.srcdoc = $("finalHtml").value; }, 500);
+});
+
+$("saveFinalBtn").addEventListener("click", async () => {
+  $("saveFinalBtn").disabled = true;
+  busy($("saveFinalStatus"), "Saving...");
+  try {
+    const r = await api(`/conversions/${currentId}/final`, "PUT", { finalHtml: $("finalHtml").value });
+    $("finalHtml").value = r.finalHtml; // the server removes any <script> tags
+    setDirty(false);
+    flash($("saveFinalStatus"), "Saved.");
+  } catch (err) {
+    $("saveFinalBtn").disabled = false;
+    flash($("saveFinalStatus"), err.message, 6000);
+  }
+});
+window.addEventListener("beforeunload", (e) => { if (finalDirty) { e.preventDefault(); e.returnValue = ""; } });
 
 // ---------- How-to guide popup ----------
 const howTo = $("howToDialog");

@@ -96,6 +96,15 @@ test("auth, roles and conversions access", async () => {
   assert.strictEqual(fin.data.finalHtml, '<img src="https://go.x.com/n-hero-01_ab12.png">');
   assert.deepStrictEqual(fin.data.unmatched, []);
 
+  // editing the final HTML: owner can save, scripts are stripped, others are refused
+  const edited = '<html><body><a href="https://x.com" target="_blank">hi</a><script>alert(1)</script></body></html>';
+  const saved = await call("PUT", "/conversions/c4/final", { finalHtml: edited }, ed);
+  assert.strictEqual(saved.status, 200);
+  assert.ok(saved.data.finalHtml.includes('target="_blank"') && !saved.data.finalHtml.includes("<script"));
+  assert.strictEqual((await call("PUT", "/conversions/c4/final", { finalHtml: edited }, vi)).status, 403);
+  assert.strictEqual((await call("PUT", "/conversions/c1/final", { finalHtml: edited }, ed)).status, 400); // not finalised yet
+  assert.ok(!(await call("GET", "/conversions/c4", null, admin)).data.conversion.previewHtml.includes("<script"));
+
   // removing a user kills their session immediately
   await call("DELETE", "/users/vi", null, admin);
   assert.strictEqual((await call("GET", "/me", null, vi)).status, 401);

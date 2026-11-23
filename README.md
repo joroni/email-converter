@@ -5,14 +5,13 @@ Plain HTML/CSS/JS frontend, Node + Express backend wrapped as a Netlify Function
 
 ## How it works
 
-1. **Convert** - `POST /api/conversions` reads the Figma frame, exports image layers as 2x PNGs and saves them to Netlify Blobs, then triggers the background function.
-2. **Background function** (`netlify/functions/convert-background.js`, up to 15 min) sends the screenshot, layer data, brand profile, platform rules, notes and the admin prompt to Claude and saves the HTML. The page polls `GET /api/conversions/:id` until it is ready.
-3. **Download images (zip)** - exported images plus the brand's stored social icons.
-4. Upload the images to Pardot Files, copy the file list HTML from the browser Inspector and paste it in the app.
-5. **Finalise** - image URLs are extracted and matched to the exported files by original name (Pardot appends extra characters), and the `src` values are replaced.
+1. **Setup** - paste a Figma frame link (or upload a PNG), pick brand and platform, optional white-page background and notes, then Convert. `POST /api/conversions` reads the Figma frame, exports image layers as flattened 2x PNGs to Netlify Blobs, and triggers the background function.
+2. **Preview** - the background function (`netlify/functions/convert-background.js`, up to 15 min) sends the screenshot, layer data, brand profile, platform rules, notes and the admin prompt to Claude and saves the HTML. The page shows a spinner and polls until it is ready. Download the images (zip: exported images plus the brand's social icons).
+3. **Image links** - upload the images to Pardot Files, copy the file list HTML from the browser Inspector (a "How to" popup shows exactly how) and paste it in. Finalise pairs each file by its original name with its hosted URL (Pardot renames and shortens files) and replaces the `src` values.
+4. **Final HTML** - click images or buttons in the live preview, or highlight text, to add links that open in a new tab. You can also edit the HTML directly. Save edits, then Copy.
 
 ```
-public/                 static frontend (login.html, app.html, js/, css/)
+public/                 static frontend (login.html, app.html, js/, css/, img/)
 netlify/functions/
   api.js                Express app via serverless-http (60 s limit)
   convert-background.js Claude step (15 min limit)
@@ -27,6 +26,8 @@ server/
   routes/               auth, users, settings (brands/platforms/prompt), conversions
 test/                   node --test
 ```
+
+See `CLAUDE.md` ("AS BUILT") for design decisions, Pardot behaviour notes and how to rebuild.
 
 ## Roles
 
@@ -43,7 +44,7 @@ Roles are checked on every API route (`requireRole` in `server/auth.js`) and the
 ```bash
 npm install
 cp .env.example .env        # fill in the values
-npx netlify-cli dev         # or: npm i -g netlify-cli && netlify dev
+npx netlify-cli dev --offline   # --offline skips an Edge Functions setup step that can hang
 ```
 
 Open http://localhost:8888 and sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`. Netlify Blobs runs locally (sandboxed) under `netlify dev`.
@@ -70,6 +71,7 @@ Secrets live only in server environment variables; the browser never sees them.
 
 ## Limits to know about
 
+- The Claude step needs `ANTHROPIC_API_KEY` on Netlify (the local CLI option only works on your own machine).
 - Netlify request/response bodies are about 6 MB: PNG uploads are capped at 4 MB and the image zip at about 5.5 MB.
 - Regular functions stop at 60 s: reading a very large Figma frame with many images could hit this. Image layers are capped at 40 per email.
 - PNG uploads have no layer data, so Claude works from the picture alone and no image layers are exported (only brand icons are included).
@@ -77,3 +79,6 @@ Secrets live only in server environment variables; the browser never sees them.
 ## Adding HubSpot (or another platform)
 
 Copy `server/platforms/hubspot.js`, set its id, default tags and how to find hosted image URLs, register it in `server/platforms/index.js`, then switch it on under **Admin settings > Platform rules**.
+
+---
+Vibe coded by: Raymund Niconi
