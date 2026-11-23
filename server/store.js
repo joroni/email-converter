@@ -9,8 +9,10 @@
 //   icons         key = icon file name      -> brand social icons (binary)
 const { getStore } = require("@netlify/blobs");
 
-// "strong" consistency so the polling page sees updates from the background function immediately.
-const open = (name) => getStore({ name, consistency: "strong" });
+// On Netlify, use "strong" consistency so the polling page sees the background function's updates
+// immediately. "netlify dev" has no edge cache (and no endpoint for strong reads), so skip it there.
+const STRONG = process.env.NETLIFY_DEV !== "true";
+const open = (name) => getStore(STRONG ? { name, consistency: "strong" } : { name });
 
 async function getJSON(storeName, key) {
   return (await open(storeName).get(key, { type: "json" })) || null;
