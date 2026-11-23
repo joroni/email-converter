@@ -72,6 +72,13 @@
   <!-- ===== Step 1: Setup ===== -->
   <div class="step-panel" id="step-1" data-role="admin editor">
     <div class="card">
+      <h2>Email name</h2>
+      <label for="emailName">Name for this email</label>
+      <input type="text" id="emailName" maxlength="60" placeholder="e.g. AROYA December newsletter" autocomplete="off" required>
+      <div class="hint">Required. Shown in History and used to name the exported images (so each email's files are easy to tell apart in Pardot).</div>
+    </div>
+
+    <div class="card">
       <h2>Source</h2>
       <div class="toggle" id="sourceToggle">
         <button data-source="figma" class="active">Figma link</button>

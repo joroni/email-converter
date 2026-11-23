@@ -135,7 +135,7 @@ $("backTo2Btn").addEventListener("click", () => setStep(2));
 $("newConversionBtn").addEventListener("click", () => {
   if (finalDirty && !confirm("You have unsaved edits. Start a new conversion anyway?")) return;
   resetResults();
-  $("figmaLink").value = ""; $("pngFile").value = ""; $("notes").value = ""; $("accordionHtml").value = "";
+  $("emailName").value = ""; $("figmaLink").value = ""; $("pngFile").value = ""; $("notes").value = ""; $("accordionHtml").value = "";
   setStep(1);
 });
 
@@ -164,8 +164,9 @@ $("sourceToggle").addEventListener("click", (e) => {
 
 $("convertBtn").addEventListener("click", async () => {
   show($("convertError"), false);
-  const body = { source, brand: $("brand").value, platform, notes: $("notes").value, whiteBody: $("whiteBody").checked };
+  const body = { source, emailName: $("emailName").value.trim(), brand: $("brand").value, platform, notes: $("notes").value, whiteBody: $("whiteBody").checked };
   try {
+    if (body.emailName.length < 2) { $("emailName").focus(); throw new Error("Give this email a name first."); }
     if (source === "figma") {
       body.figmaLink = $("figmaLink").value.trim();
       if (!body.figmaLink) throw new Error("Paste a Figma frame link first.");
@@ -399,6 +400,8 @@ function linkRange(range, url, newTab) {
     if (!sub.toString().trim()) return;
     const a = doc.createElement("a");
     setLinkAttrs(a, url, newTab);
+    // Linked text keeps its surrounding colour (no default blue) and is underlined instead.
+    a.setAttribute("style", "color:inherit;text-decoration:underline;");
     sub.surroundContents(a);
   });
 }
@@ -471,7 +474,7 @@ async function loadHistory() {
   try {
     const { conversions } = await api("/conversions");
     $("historyBody").innerHTML = conversions.length ? conversions.map((h) => `
-      <tr><td>${esc(h.createdAt.slice(0, 10))}</td><td>${esc(h.name)}</td><td>${esc(h.brand)}</td><td>${esc(h.platform)}</td><td>${esc(h.by)}</td>
+      <tr><td>${esc(h.createdAt.slice(0, 10))}</td><td>${esc(h.title || h.name)}</td><td>${esc(h.brand)}</td><td>${esc(h.platform)}</td><td>${esc(h.by)}</td>
       <td><span class="badge ${h.status === "processing" ? "status-processing" : h.status === "error" ? "status-error" : "ok"}">${esc(h.status)}</span></td>
       <td><button class="btn secondary small" data-open="${esc(h.id)}">Open</button></td></tr>`).join("")
       : `<tr><td colspan="7">No conversions yet.</td></tr>`;

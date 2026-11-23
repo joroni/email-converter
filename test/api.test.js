@@ -71,6 +71,12 @@ test("auth, roles and conversions access", async () => {
   assert.strictEqual(cfg.platforms.find((p) => p.id === "hubspot").enabled, false);
   assert.strictEqual((await call("POST", "/conversions", { source: "png", brand: "Aqualab", platform: "hubspot" }, ed)).status, 400);
 
+  // an email name is required
+  const noName = await call("POST", "/conversions", { source: "png", brand: "Aqualab", platform: "pardot" }, ed);
+  assert.strictEqual(noName.status, 400);
+  assert.match(noName.data.error, /name/i);
+  assert.strictEqual((await call("POST", "/conversions", { source: "png", brand: "Aqualab", platform: "pardot", emailName: " " }, ed)).status, 400);
+
   // visibility: seed conversions directly
   const mk = (id, by, status) => ({ id, name: id, by, status, brand: { name: "Aqualab" }, platform: "pardot", images: [], html: "<table></table>", createdAt: "2026-01-01T00:00:00Z" });
   await store.setJSON("conversions", "c1", mk("c1", "ed", "ready"));

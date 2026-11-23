@@ -41,7 +41,7 @@ const imageUrl = (id, name) => `/api/conversions/${id}/images/${encodeURICompone
 // What the browser gets. Viewers never get the raw HTML.
 function present(conv, user) {
   const out = {
-    id: conv.id, name: conv.name, brand: conv.brand.name, platform: conv.platform, source: conv.source,
+    id: conv.id, name: conv.name, title: conv.title || conv.name, brand: conv.brand.name, platform: conv.platform, source: conv.source,
     by: conv.by, status: conv.status, error: conv.error, createdAt: conv.createdAt,
     imageCount: conv.images.length,
   };
@@ -64,12 +64,16 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
   const rules = await platforms.getRules(body.platform);
   if (!rules || !rules.enabled) return res.status(400).json({ error: "That platform isn't available yet." });
 
+  // Every conversion needs a name: it titles the History row and prefixes the exported file names.
+  const title = String(body.emailName || "").trim().replace(/\s+/g, " ");
+  if (title.length < 2 || title.length > 60) return res.status(400).json({ error: "Give this email a name (2-60 characters)." });
+
   const id = newId();
   let emailName, screenshot, frameData = null, layerImages = [];
 
   if (body.source === "figma") {
     try {
-      ({ emailName, screenshot, frameData, images: layerImages } = await figma.readFrame(body.figmaLink, body.emailName));
+      ({ emailName, screenshot, frameData, images: layerImages } = await figma.readFrame(body.figmaLink, title));
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }
@@ -78,7 +82,7 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
     if (!png.length || png.length > MAX_PNG_BYTES) return res.status(400).json({ error: "Upload a PNG under 4 MB." });
     if (png.slice(0, 4).toString("hex") !== "89504e47") return res.status(400).json({ error: "That file isn't a PNG." });
     screenshot = png;
-    emailName = slug(String(body.pngName || "").replace(/\.png$/i, ""), "email");
+    emailName = slug(title, "email");
   } else {
     return res.status(400).json({ error: "Choose a Figma link or a PNG upload." });
   }
@@ -91,7 +95,7 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
   // Brand icons used by this email travel with the images (they also need uploading to the platform).
   const icons = brand.socials.filter((s) => s.on && s.icon).map((s) => ({ name: s.icon, kind: "icon" }));
   const conv = {
-    id, name: emailName, source: body.source, notes: String(body.notes || "").slice(0, 2000), whiteBody: !!body.whiteBody,
+    id, name: emailName, title, source: body.source, notes: String(body.notes || "").slice(0, 2000), whiteBody: !!body.whiteBody,
     brand, platform: body.platform, platformRules: rules, by: req.user.username,
     status: "processing", createdAt: new Date().toISOString(),
     images: [...layerImages.map((i) => ({ name: i.name, kind: "layer" })), ...icons],
@@ -123,7 +127,7 @@ router.get("/", auth.requireRole(), async (req, res) => {
   const rows = all.filter((c) => canView(req.user, c))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 200)
-    .map((c) => ({ id: c.id, name: c.name, brand: c.brand.name, platform: c.platform, by: c.by, status: c.status, createdAt: c.createdAt }));
+    .map((c) => ({ id: c.id, name: c.name, title: c.title || c.name, brand: c.brand.name, platform: c.platform, by: c.by, status: c.status, createdAt: c.createdAt }));
   res.json({ conversions: rows });
 });
 
