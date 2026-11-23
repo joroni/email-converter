@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Converter</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===== Top bar: hamburger menu + user avatar ===== -->
+<header class="topbar">
+  <button id="menuBtn" class="hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="drawer">
+    <span></span><span></span><span></span>
+  </button>
+  <span class="brand">Email Converter</span>
+
+  <!-- Avatar + user dropdown (right side) -->
+  <div class="user-menu" id="userMenu">
+    <button id="avatarBtn" class="avatar-btn" aria-haspopup="true" aria-expanded="false" aria-label="User menu">
+      <img id="avatarImg" class="avatar" alt="" width="36" height="36">
+    </button>
+    <div class="user-dropdown" id="userDropdown" role="menu">
+      <div class="user-info">
+        <img id="avatarImgLg" class="avatar" alt="" width="40" height="40">
+        <div>
+          <div class="user-name" id="userName"></div>
+          <div class="user-role" id="userRole"></div>
+        </div>
+      </div>
+      <a href="#" role="menuitem" data-link="password">Change password</a>
+      <a href="#" role="menuitem" data-link="history">My conversions</a>
+      <hr>
+      <a href="#" role="menuitem" data-link="logout">Sign out</a>
+    </div>
+  </div>
+</header>
+
+<!-- Sliding panel (opened by the hamburger), works at every screen width -->
+<div id="overlay" class="overlay"></div>
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <strong>Menu</strong>
+    <button id="closeMenuBtn" class="drawer-close" aria-label="Close menu">&times;</button>
+  </div>
+  <nav id="nav">
+    <button data-view="converter" class="active">Converter</button>
+    <button data-view="history">History</button>
+    <button data-view="admin" data-role="admin">Admin settings</button>
+  </nav>
+</aside>
+
+<main>
+
+<!-- ===================== CONVERTER ===================== -->
+<section id="view-converter" class="view active">
+
+  <!-- Viewer role sees this notice instead of the input form -->
+  <div class="card hidden" id="viewerNotice" data-show-role="viewer">
+    <strong>View only.</strong> Your role can open finished conversions from the History page but can't run new ones.
+  </div>
+
+  <div id="runPanel" data-role="admin editor">
+    <!-- 1. Source -->
+    <div class="card">
+      <h2>1. Source</h2>
+      <div class="toggle" id="sourceToggle">
+        <button data-source="figma" class="active">Figma link</button>
+        <button data-source="png">PNG upload</button>
+      </div>
+      <div style="margin-top:14px" id="sourceFigma">
+        <label for="figmaLink">Figma frame link</label>
+        <input type="url" id="figmaLink" placeholder="https://www.figma.com/design/ABC123/Newsletter?node-id=12-345">
+        <div class="hint">In Figma: right-click the frame, then Copy/Paste as, then Copy link to selection.</div>
+      </div>
+      <div style="margin-top:14px" class="hidden" id="sourcePng">
+        <label for="pngFile">PNG exported from Figma</label>
+        <input type="file" id="pngFile" accept="image/png">
+        <div class="hint">Claude will read the image and detect which social icons appear.</div>
+      </div>
+    </div>
+
+    <!-- 2. Brand + platform + notes -->
+    <div class="card">
+      <h2>2. Options</h2>
+      <div class="row">
+        <div>
+          <label for="brand">Brand</label>
+          <select id="brand"></select>
+          <div class="hint" id="brandHint"></div>
+        </div>
+        <div>
+          <label>Platform</label>
+          <div class="toggle" id="platformToggle"></div>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" placeholder="One-off instructions, usually left empty."></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn" id="convertBtn">Convert</button>
+        <span class="progress" id="convertStatus"></span>
+      </div>
+      <div class="error hidden" id="convertError"></div>
+    </div>
+  </div>
+
+  <!-- 3. Results -->
+  <div class="card hidden" id="results">
+    <h2>3. Email preview</h2>
+    <iframe class="preview" id="previewFrame" title="Email preview"></iframe>
+    <div class="actions" data-role="admin editor">
+      <button class="btn secondary" id="zipBtn">Download images (zip)</button>
+      <span class="hint">Upload these to Pardot Files, then paste the Files accordion HTML below.</span>
+    </div>
+  </div>
+
+  <!-- 4. Finalise -->
+  <div class="card hidden" id="finalise" data-role="admin editor">
+    <h2>4. Add hosted image links</h2>
+    <p class="hint" style="margin:0 0 8px">After uploading the images to Pardot Files, copy the image list HTML from your browser's Inspector and paste it below.</p>
+    <textarea class="code" id="accordionHtml" placeholder="Paste the HTML copied from Inspector"></textarea>
+    <div class="actions">
+      <button class="btn" id="finaliseBtn">Finalise</button>
+      <span class="progress" id="finaliseStatus"></span>
+    </div>
+  </div>
+
+  <!-- 5. Final HTML -->
+  <div class="card hidden" id="final">
+    <h2>5. Final HTML</h2>
+    <textarea class="code" id="finalHtml" readonly></textarea>
+    <div class="actions">
+      <button class="btn" id="copyBtn">Copy</button>
+      <span class="progress" id="copyStatus"></span>
+    </div>
+    <h3 style="margin-top:20px">Live preview</h3>
+    <iframe class="preview" id="finalFrame" title="Final preview"></iframe>
+  </div>
+</section>
+
+<!-- ===================== HISTORY ===================== -->
+<section id="view-history" class="view">
+  <div class="card">
+    <h2>History</h2>
+    <p class="hint" id="historyScope"></p>
+    <div class="table-wrap"><table class="list">
+      <thead><tr><th>Date</th><th>Email name</th><th>Brand</th><th>Platform</th><th>By</th><th>Status</th><th></th></tr></thead>
+      <tbody id="historyBody"></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ===================== ADMIN ===================== -->
+<section id="view-admin" class="view" data-role="admin">
+  <div class="toggle subtabs" id="adminTabs">
+    <button data-tab="users" class="active">Users</button>
+    <button data-tab="brands">Brands</button>
+    <button data-tab="platforms">Platform rules</button>
+    <button data-tab="prompt">Claude prompt</button>
+  </div>
+
+  <!-- Users -->
+  <div class="card admin-tab" id="tab-users">
+    <h2>Users</h2>
+    <div class="table-wrap"><table class="list">
+      <thead><tr><th>Username</th><th>Role</th><th></th></tr></thead>
+      <tbody id="usersBody"></tbody>
+    </table></div>
+    <h3 style="margin-top:20px">Add user</h3>
+    <div class="row">
+      <input type="text" id="newUserName" placeholder="Username">
+      <input type="password" id="newUserPass" placeholder="Temporary password">
+      <select id="newUserRole"><option>Admin</option><option selected>Editor</option><option>Viewer</option></select>
+      <button class="btn" id="addUserBtn" style="flex:0">Add</button>
+    </div>
+  </div>
+
+  <!-- Brands -->
+  <div class="card admin-tab hidden" id="tab-brands">
+    <h2>Brands</h2>
+    <div id="brandsList"></div>
+    <div class="actions"><button class="btn secondary" id="addBrandBtn">+ Add brand</button><button class="btn" id="saveBrandsBtn">Save brands</button><span class="progress" id="brandsStatus"></span></div>
+  </div>
+
+  <!-- Platform rules -->
+  <div class="card admin-tab hidden" id="tab-platforms">
+    <h2>Platform rules</h2>
+    <div id="platformsList"></div>
+    <div class="actions"><button class="btn" id="savePlatformsBtn">Save platform rules</button><span class="progress" id="platformsStatus"></span></div>
+  </div>
+
+  <!-- Claude prompt -->
+  <div class="card admin-tab hidden" id="tab-prompt">
+    <h2>Claude prompt</h2>
+    <textarea class="code" id="claudePrompt" style="min-height:360px"></textarea>
+    <div class="hint">Hidden from Editors and Viewers. Sent to Claude with every conversion.</div>
+    <div class="actions"><button class="btn" id="savePromptBtn">Save prompt</button><span class="progress" id="promptStatus"></span></div>
+  </div>
+</section>
+
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>

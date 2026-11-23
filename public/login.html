@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Converter - Sign in</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="login-wrap card">
+    <h1>Email Converter</h1>
+    <!-- No sign-up on purpose: an admin creates accounts. -->
+    <form id="loginForm">
+      <div class="field">
+        <label for="user">Username</label>
+        <input type="text" id="user" autocomplete="username" autofocus required>
+      </div>
+      <div class="field">
+        <label for="pass">Password</label>
+        <input type="password" id="pass" autocomplete="current-password" required>
+      </div>
+      <button class="btn" style="width:100%" id="signInBtn">Sign in</button>
+      <p class="error hidden" id="loginError"></p>
+      <p class="hint">Accounts are created by an admin.</p>
+    </form>
+  </div>
+  <script>
+    // If already signed in, skip straight to the app.
+    fetch("/api/me").then((r) => { if (r.ok) location.href = "app.html"; });
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const err = document.getElementById("loginError");
+      err.classList.add("hidden");
+      document.getElementById("signInBtn").disabled = true;
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: document.getElementById("user").value, password: document.getElementById("pass").value }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Sign in failed.");
+        location.href = "app.html";
+      } catch (ex) {
+        err.textContent = ex.message;
+        err.classList.remove("hidden");
+        document.getElementById("signInBtn").disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
