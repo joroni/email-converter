@@ -29,6 +29,14 @@ function parseFigmaLink(link) {
 const hex = (c) => "#" + [c.r, c.g, c.b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
 const hasImageFill = (n) => Array.isArray(n.fills) && n.fills.some((f) => f.type === "IMAGE" && f.visible !== false);
 
+// All visible text inside a layer, in reading order (used for the image's alt text).
+function collectText(node, out = []) {
+  if (node.visible === false) return out;
+  if (node.type === "TEXT" && node.characters && node.characters.trim()) out.push(node.characters.trim());
+  (node.children || []).forEach((c) => collectText(c, out));
+  return out;
+}
+
 // Walk the tree once: build a compact description for Claude and collect image layers to export.
 function walk(frame) {
   const origin = frame.absoluteBoundingBox || { x: 0, y: 0 };
@@ -49,9 +57,14 @@ function walk(frame) {
       const s = node.style || {};
       out.font = { family: s.fontFamily, size: s.fontSize, weight: s.fontWeight, align: s.textHorizontalAlignment, lineHeight: s.lineHeightPx && Math.round(s.lineHeightPx) };
     }
-    // An image layer: export it (once) and don't descend into it.
+    // A layer with a picture fill is exported as ONE flattened image, exactly as it looks in Figma
+    // (text and buttons on top included). Overlay text on a background image breaks in many email
+    // clients (Outlook ignores CSS backgrounds), so we keep it as a picture and let Claude give it
+    // alt text and a link instead of rebuilding the text.
     if (!insideImage && hasImageFill(node) && layers.length < MAX_IMAGES) {
+      const texts = collectText(node);
       out.exportedImage = true;
+      if (texts.length) out.textInsideImage = texts;
       layers.push({ id: node.id, section, node: out });
       return out;
     }
@@ -90,9 +103,16 @@ async function readFrame(link, emailNameOverride) {
   const shot = await figma(`/images/${fileKey}?ids=${encodeURIComponent(nodeId)}&format=png&scale=${shotScale.toFixed(3)}`);
   const screenshot = await download(shot.images[nodeId]);
 
-  // Export every image layer at 2x, in small batches to keep URLs short.
   const images = [];
   const used = new Set();
+  const uniqueName = (section) => {
+    let n = images.length + 1, name;
+    do { name = `${emailName.slice(0, 30)}-${section.slice(0, 18)}-${String(n++).padStart(2, "0")}`.replace(/-+/g, "-"); } while (used.has(name));
+    used.add(name);
+    return name;
+  };
+
+  // Every image layer, rendered at 2x, in small batches to keep URLs short.
   for (let i = 0; i < layers.length; i += 15) {
     const batch = layers.slice(i, i + 15);
     const ids = batch.map((l) => l.id).join(",");
@@ -100,11 +120,7 @@ async function readFrame(link, emailNameOverride) {
     for (const layer of batch) {
       const url = out.images && out.images[layer.id];
       if (!url) continue;
-      // Clear unique name: <email>-<section>-<number>.png
-      let n = images.length + 1;
-      let name;
-      do { name = `${emailName}-${layer.section}-${String(n++).padStart(2, "0")}.png`; } while (used.has(name));
-      used.add(name);
+      const name = uniqueName(layer.section) + ".png"; // <email>-<section>-<number>.png
       layer.node.exportedImage = name;
       images.push({ name, buffer: await download(url) });
     }

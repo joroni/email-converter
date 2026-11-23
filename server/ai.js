@@ -14,10 +14,13 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 const MAX_FRAME_CHARS = 150000;
 
 // Everything except the screenshot, as plain text.
-function buildContext({ brand, platform, notes, frameData, imageNames, source }) {
+function buildContext({ brand, platform, notes, whiteBody, frameData, imageNames, source }) {
   const parts = [];
   parts.push("## Brand profile\n" + JSON.stringify(brand, null, 2));
   parts.push("## Platform rules\n" + JSON.stringify(platform, null, 2));
+  parts.push("## Page background\n" + (whiteBody
+    ? "WHITE PAGE: the outer page/body must be white (#ffffff) - set bgcolor and background-color on <body> and on the outer 100%-width table to white. Apply any background colour from the design ONLY to the 600px content wrapper table (or the individual sections inside it), never to the body or the outer table."
+    : "Apply the design's page background colour to the <body> and the outer 100%-width table (bgcolor + background-color), with the 600px content wrapper on top."));
   if (notes && notes.trim()) parts.push("## Notes for this email\n" + notes.trim());
   if (imageNames.length) {
     parts.push("## Exported image files (use these exact names as img src)\n" + imageNames.join("\n"));
@@ -25,6 +28,11 @@ function buildContext({ brand, platform, notes, frameData, imageNames, source })
     parts.push("## Exported image files\nNone. Use only the brand's icon files; for other pictures leave a clearly sized placeholder cell.");
   }
   if (frameData) {
+    if (JSON.stringify(frameData).includes('"textInsideImage"')) {
+      parts.push("## Images that contain text\nLayers with textInsideImage are exported as ONE flattened picture that already includes that text (and any button) as pixels. " +
+        "Output them as a single <img> (display:block, full width of the layer) and do NOT rebuild the text or button as HTML or use the picture as a CSS background. " +
+        "Use the textInsideImage strings as the alt text. If the design shows a button or link there, wrap the <img> in an <a> to that link (use any URL in the layer name or the notes, otherwise href=\"#\").");
+    }
     let json = JSON.stringify(frameData);
     if (json.length > MAX_FRAME_CHARS) json = json.slice(0, MAX_FRAME_CHARS) + "...(truncated)";
     parts.push("## Figma layer data (simplified; box = [x, y, width, height])\n" + json);

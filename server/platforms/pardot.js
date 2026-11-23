@@ -1,5 +1,5 @@
 // Pardot rules. To add or change a platform, copy this file and register it in ./index.js.
-const { extractImageUrls } = require("./common");
+const { extractImageUrls, extractNamedFiles } = require("./common");
 
 module.exports = {
   id: "pardot",
@@ -13,4 +13,6 @@ module.exports = {
   },
   // How to find hosted image URLs in what the user pastes back (Pardot Files page HTML).
   extractImageUrls,
+  // Pardot's file list also shows each file's original name, so files are paired exactly.
+  extractNamedFiles,
 };

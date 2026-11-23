@@ -23,6 +23,7 @@ async function runConversion(id) {
       brand: conv.brand,
       platform: conv.platformRules,
       notes: conv.notes,
+      whiteBody: !!conv.whiteBody,
       frameData,
       screenshot,
       imageNames: conv.images.filter((i) => i.kind === "layer").map((i) => i.name),

@@ -9,7 +9,7 @@ const store = require("../store");
 const auth = require("../auth");
 const figma = require("../figma");
 const platforms = require("../platforms");
-const { matchImages, swapImageSrcs } = require("../platforms/common");
+const { resolveMatches, swapImageSrcs } = require("../platforms/common");
 const { hmac, newId, slug } = require("../util");
 
 const MAX_PNG_BYTES = 4 * 1024 * 1024; // Netlify request bodies are limited to ~6 MB (base64 adds a third)
@@ -91,7 +91,7 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
   // Brand icons used by this email travel with the images (they also need uploading to the platform).
   const icons = brand.socials.filter((s) => s.on && s.icon).map((s) => ({ name: s.icon, kind: "icon" }));
   const conv = {
-    id, name: emailName, source: body.source, notes: String(body.notes || "").slice(0, 2000),
+    id, name: emailName, source: body.source, notes: String(body.notes || "").slice(0, 2000), whiteBody: !!body.whiteBody,
     brand, platform: body.platform, platformRules: rules, by: req.user.username,
     status: "processing", createdAt: new Date().toISOString(),
     images: [...layerImages.map((i) => ({ name: i.name, kind: "layer" })), ...icons],
@@ -100,7 +100,8 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
 
   // Kick off the background function. It answers 202 straight away and keeps working.
   try {
-    const origin = `${req.get("x-forwarded-proto") || req.protocol}://${req.get("host")}`;
+    // Netlify sets DEPLOY_URL (this exact deploy) and URL (the site; localhost under "netlify dev").
+    const origin = process.env.DEPLOY_URL || process.env.URL || `${req.protocol}://${req.get("host")}`;
     const r = await fetch(`${origin}/.netlify/functions/convert-background`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -108,6 +109,7 @@ router.post("/", auth.requireRole("admin", "editor"), async (req, res) => {
     });
     if (!r.ok) throw new Error(`background function answered ${r.status}`);
   } catch (err) {
+    console.error("Could not trigger background function", err.cause || err);
     await store.setJSON("conversions", id, { ...conv, status: "error", error: "Could not start the conversion: " + err.message });
     return res.status(500).json({ error: "Could not start the conversion. Please try again." });
   }
@@ -161,11 +163,10 @@ router.post("/:id/finalise", auth.requireRole("admin", "editor"), loadConv, need
   if (text.length > 2 * 1024 * 1024) return res.status(400).json({ error: "That paste is too large." });
 
   const mod = platforms.registry[conv.platform];
-  const urls = mod.extractImageUrls(text);
-  if (!urls.length) return res.status(400).json({ error: "No image URLs found in that HTML. Copy the file list again from Inspector." });
+  if (!mod.extractImageUrls(text).length) return res.status(400).json({ error: "No image URLs found in that HTML. Copy the file list again from Inspector." });
 
   const names = conv.images.map((i) => i.name);
-  const matches = matchImages(names, urls);
+  const matches = resolveMatches(names, text, mod);
   const finalHtml = swapImageSrcs(conv.html, matches);
   await store.setJSON("conversions", conv.id, { ...conv, status: "finalised", finalHtml, updatedAt: new Date().toISOString() });
   res.json({

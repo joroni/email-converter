@@ -116,3 +116,44 @@ body { overflow-x: hidden; }
 .error { color: var(--danger); font-size: 13px; margin-top: 10px; }
 .status-processing { background: #fff4d6; color: #8a6100; }
 .status-error { background: #fde4e4; color: var(--danger); }
+
+/* ---------- Loading spinner ---------- */
+.progress { display: inline-flex; align-items: center; gap: 8px; }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+/* ---------- Stepper ---------- */
+.stepper { list-style: none; display: flex; margin: 0 0 20px; padding: 0; }
+.stepper li { flex: 1; position: relative; }
+.stepper li + li::before { content: ""; position: absolute; top: 18px; right: 50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+.stepper li.done + li::before, .stepper li.current::before { background: var(--primary); }
+.stepper button { position: relative; z-index: 1; width: 100%; background: none; border: 0; padding: 0; cursor: default; display: flex; flex-direction: column; align-items: center; gap: 6px; font: inherit; color: var(--muted); }
+.stepper .step-num { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.stepper .step-label { font-size: 13px; font-weight: 600; }
+.stepper li.reached button { cursor: pointer; color: var(--text); }
+.stepper li.reached .step-num { border-color: var(--primary); color: var(--primary); }
+.stepper li.done .step-num { background: var(--primary); border-color: var(--primary); color: #fff; }
+.stepper li.current .step-num { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 0 0 4px rgba(31,111,235,.2); }
+.stepper li.reached button:hover .step-num { box-shadow: 0 0 0 4px rgba(31,111,235,.15); }
+.step-panel { display: none; }
+.step-panel.current { display: block; }
+.empty-hint { color: var(--muted); }
+#previewFrame.hidden-frame { display: none; }
+@media (max-width: 480px) { .stepper .step-label { font-size: 11px; } }
+.notice { background: #e8f5ee; color: #14633f; border: 1px solid #bfe3cf; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+.notice.warn { background: #fff4d6; color: #7a5600; border-color: #f0d48a; }
+
+/* ---------- How-to guide popup ---------- */
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; }
+.card-head h2 { margin: 0; }
+dialog.guide { width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 0; border-radius: 10px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.35); color: var(--text); }
+dialog.guide::backdrop { background: rgba(0,0,0,.5); }
+.guide-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.guide-head h2 { font-size: 20px; }
+.guide-steps { padding-left: 22px; margin: 8px 0 16px; }
+.guide-steps li { margin-bottom: 22px; padding-left: 4px; }
+.guide-steps h3 { font-size: 16px; margin-bottom: 6px; }
+.guide-steps p { margin: 0 0 10px; line-height: 1.5; }
+.guide-steps img { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; display: block; }
+.guide-steps code, .guide-steps kbd { background: #eef1f5; border-radius: 4px; padding: 1px 5px; font-size: 12px; }

@@ -60,10 +60,18 @@
     <strong>View only.</strong> Your role can open finished conversions from the History page but can't run new ones.
   </div>
 
-  <div id="runPanel" data-role="admin editor">
-    <!-- 1. Source -->
+  <!-- Stepper: steps become clickable once they've been reached -->
+  <ol class="stepper" id="stepper">
+    <li><button type="button" data-step="1" data-role="admin editor"><span class="step-num">1</span><span class="step-label">Setup</span></button></li>
+    <li><button type="button" data-step="2"><span class="step-num">2</span><span class="step-label">Preview</span></button></li>
+    <li><button type="button" data-step="3" data-role="admin editor"><span class="step-num">3</span><span class="step-label">Image links</span></button></li>
+    <li><button type="button" data-step="4" data-role="admin editor"><span class="step-num">4</span><span class="step-label">Final HTML</span></button></li>
+  </ol>
+
+  <!-- ===== Step 1: Setup ===== -->
+  <div class="step-panel" id="step-1" data-role="admin editor">
     <div class="card">
-      <h2>1. Source</h2>
+      <h2>Source</h2>
       <div class="toggle" id="sourceToggle">
         <button data-source="figma" class="active">Figma link</button>
         <button data-source="png">PNG upload</button>
@@ -80,9 +88,8 @@
       </div>
     </div>
 
-    <!-- 2. Brand + platform + notes -->
     <div class="card">
-      <h2>2. Options</h2>
+      <h2>Options</h2>
       <div class="row">
         <div>
           <label for="brand">Brand</label>
@@ -93,6 +100,12 @@
           <label>Platform</label>
           <div class="toggle" id="platformToggle"></div>
         </div>
+      </div>
+      <div style="margin-top:14px">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:600">
+          <input type="checkbox" id="whiteBody" style="width:auto"> White page background
+        </label>
+        <div class="hint">Ticked: the page behind the email stays white and any background colour is applied only to the content wrapper. Unticked: the design's background colour is applied to the whole page (body).</div>
       </div>
       <div style="margin-top:14px">
         <label for="notes">Notes (optional)</label>
@@ -106,37 +119,51 @@
     </div>
   </div>
 
-  <!-- 3. Results -->
-  <div class="card hidden" id="results">
-    <h2>3. Email preview</h2>
-    <iframe class="preview" id="previewFrame" title="Email preview"></iframe>
-    <div class="actions" data-role="admin editor">
-      <button class="btn secondary" id="zipBtn">Download images (zip)</button>
-      <span class="hint">Upload these to Pardot Files, then paste the Files accordion HTML below.</span>
+  <!-- ===== Step 2: Preview ===== -->
+  <div class="step-panel" id="step-2">
+    <div class="card">
+      <h2>Email preview</h2>
+      <p class="empty-hint" id="previewEmpty">Run a conversion in step 1, or open one from History.</p>
+      <iframe class="preview" id="previewFrame" title="Email preview"></iframe>
+      <div class="actions" data-role="admin editor">
+        <button class="btn secondary" id="zipBtn">Download images (zip)</button>
+        <button class="btn" id="toStep3Btn">Next: add image links &rarr;</button>
+      </div>
+      <div class="hint" data-role="admin editor" style="margin-top:8px">Upload the images to Pardot Files first, then continue.</div>
     </div>
   </div>
 
-  <!-- 4. Finalise -->
-  <div class="card hidden" id="finalise" data-role="admin editor">
-    <h2>4. Add hosted image links</h2>
-    <p class="hint" style="margin:0 0 8px">After uploading the images to Pardot Files, copy the image list HTML from your browser's Inspector and paste it below.</p>
-    <textarea class="code" id="accordionHtml" placeholder="Paste the HTML copied from Inspector"></textarea>
-    <div class="actions">
-      <button class="btn" id="finaliseBtn">Finalise</button>
-      <span class="progress" id="finaliseStatus"></span>
+  <!-- ===== Step 3: Image links ===== -->
+  <div class="step-panel" id="step-3" data-role="admin editor">
+    <div class="card">
+      <div class="card-head">
+        <h2>Add hosted image links</h2>
+        <button type="button" class="btn secondary small" id="howToBtn">? How to</button>
+      </div>
+      <p class="hint" style="margin:0 0 8px">After uploading the images to Pardot Files, copy the image list HTML from your browser's Inspector and paste it below.</p>
+      <textarea class="code" id="accordionHtml" placeholder="Paste the HTML copied from Inspector"></textarea>
+      <div class="actions">
+        <button class="btn secondary" id="backTo2Btn">&larr; Back</button>
+        <button class="btn" id="finaliseBtn">Finalise</button>
+        <span class="progress" id="finaliseStatus"></span>
+      </div>
     </div>
   </div>
 
-  <!-- 5. Final HTML -->
-  <div class="card hidden" id="final">
-    <h2>5. Final HTML</h2>
-    <textarea class="code" id="finalHtml" readonly></textarea>
-    <div class="actions">
-      <button class="btn" id="copyBtn">Copy</button>
-      <span class="progress" id="copyStatus"></span>
+  <!-- ===== Step 4: Final HTML ===== -->
+  <div class="step-panel" id="step-4" data-role="admin editor">
+    <div class="card">
+      <h2>Final HTML</h2>
+      <div class="notice hidden" id="finalNote"></div>
+      <textarea class="code" id="finalHtml" readonly></textarea>
+      <div class="actions">
+        <button class="btn" id="copyBtn">Copy</button>
+        <button class="btn secondary" id="newConversionBtn">Start a new conversion</button>
+        <span class="progress" id="copyStatus"></span>
+      </div>
+      <h3 style="margin-top:20px">Live preview</h3>
+      <iframe class="preview" id="finalFrame" title="Final preview"></iframe>
     </div>
-    <h3 style="margin-top:20px">Live preview</h3>
-    <iframe class="preview" id="finalFrame" title="Final preview"></iframe>
   </div>
 </section>
 
@@ -201,6 +228,32 @@
 </section>
 
 </main>
+
+
+<!-- How-to guide popup (opened from step 3) -->
+<dialog id="howToDialog" class="guide" aria-labelledby="howToTitle">
+  <div class="guide-head">
+    <h2 id="howToTitle">How to get the image links from Pardot</h2>
+    <button type="button" class="drawer-close guide-close" id="howToClose" aria-label="Close" style="color:var(--text)">&times;</button>
+  </div>
+  <ol class="guide-steps">
+    <li>
+      <h3>Upload the images to Pardot Files</h3>
+      <p>In step 2, click <strong>Download images (zip)</strong> and unzip it. In Pardot go to <strong>Marketing &gt; Content &gt; Files</strong>, click <strong>Upload Files</strong> and choose every image from the zip. Wait until each one shows <em>"was successfully uploaded."</em></p>
+      <a href="img/guide-pardot-files.png" target="_blank" rel="noopener" title="Open full size"><img src="img/guide-pardot-files.png" alt="Pardot Files page with the uploaded images listed" loading="lazy"></a>
+    </li>
+    <li>
+      <h3>Copy the file list from the browser Inspector</h3>
+      <p>On that same page, right-click anywhere and choose <strong>Inspect</strong> (or press <kbd>F12</kbd>, or <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>I</kbd> on Mac). In the <strong>Elements</strong> tab find the line <code>&lt;div class="accordion" id="file-upload-accordion"&gt;</code> and click it so it is highlighted. Right-click it and choose <strong>Copy</strong> (in Chrome: Copy &gt; Copy outerHTML).</p>
+      <a href="img/guide-inspector-copy.png" target="_blank" rel="noopener" title="Open full size"><img src="img/guide-inspector-copy.png" alt="Browser Inspector with the file-upload-accordion element selected and Copy chosen" loading="lazy"></a>
+    </li>
+    <li>
+      <h3>Paste it here and click Finalise</h3>
+      <p>Close this guide, paste into the box, and click <strong>Finalise</strong>. The tool matches each image by its original file name and fills in the Pardot links.</p>
+    </li>
+  </ol>
+  <div class="actions"><button type="button" class="btn" id="howToDone">Got it</button></div>
+</dialog>
 
 <script src="js/app.js"></script>
 </body>

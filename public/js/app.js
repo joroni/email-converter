@@ -26,6 +26,11 @@ async function api(path, method = "GET", body) {
   return data;
 }
 
+// Show a spinner + message (used while something is running). Clear it with el.textContent = "".
+function busy(el, text) {
+  el.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${esc(text)}</span>`;
+}
+
 function flash(el, text, ms = 2500) {
   el.textContent = text;
   if (ms) setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, ms);
@@ -106,6 +111,33 @@ $("userDropdown").addEventListener("click", async (e) => {
   }
 });
 
+// ---------- Stepper ----------
+// reached[n] = the step can be opened (clicked). Steps unlock as the work progresses.
+let reached = { 1: true };
+let step = 1;
+
+function setStep(n) {
+  step = n;
+  document.querySelectorAll(".step-panel").forEach((p) => p.classList.toggle("current", p.id === "step-" + n));
+  document.querySelectorAll("#stepper li").forEach((li) => {
+    const i = +li.firstElementChild.dataset.step;
+    li.classList.toggle("current", i === n);
+    li.classList.toggle("reached", !!reached[i]);
+    li.classList.toggle("done", !!reached[i] && i < n);
+  });
+}
+$("stepper").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-step]");
+  if (btn && reached[+btn.dataset.step]) setStep(+btn.dataset.step);
+});
+$("toStep3Btn").addEventListener("click", () => setStep(3));
+$("backTo2Btn").addEventListener("click", () => setStep(2));
+$("newConversionBtn").addEventListener("click", () => {
+  resetResults();
+  $("figmaLink").value = ""; $("pngFile").value = ""; $("notes").value = ""; $("accordionHtml").value = "";
+  setStep(1);
+});
+
 // ---------- Converter ----------
 function fillOptions() {
   $("brand").innerHTML = config.brands.map((b) => `<option>${esc(b)}</option>`).join("");
@@ -131,7 +163,7 @@ $("sourceToggle").addEventListener("click", (e) => {
 
 $("convertBtn").addEventListener("click", async () => {
   show($("convertError"), false);
-  const body = { source, brand: $("brand").value, platform, notes: $("notes").value };
+  const body = { source, brand: $("brand").value, platform, notes: $("notes").value, whiteBody: $("whiteBody").checked };
   try {
     if (source === "figma") {
       body.figmaLink = $("figmaLink").value.trim();
@@ -144,10 +176,10 @@ $("convertBtn").addEventListener("click", async () => {
       body.pngName = file.name;
     }
     $("convertBtn").disabled = true;
-    flash($("convertStatus"), "Reading the design and exporting images...", 0);
+    busy($("convertStatus"), "Reading the design and exporting images...");
     const { id } = await api("/conversions", "POST", body);
     resetResults();
-    flash($("convertStatus"), "Claude is writing the HTML. This can take a few minutes...", 0);
+    busy($("convertStatus"), "Claude is writing the HTML. This can take a few minutes...");
     poll(id);
   } catch (err) {
     $("convertBtn").disabled = false;
@@ -159,7 +191,12 @@ $("convertBtn").addEventListener("click", async () => {
 
 function resetResults() {
   currentId = null;
-  ["results", "finalise", "final"].forEach((id) => show($(id), false));
+  reached = me && me.role === "viewer" ? { 2: true } : { 1: true };
+  show($("finalNote"), false);
+  $("previewFrame").srcdoc = ""; $("finalFrame").srcdoc = ""; $("finalHtml").value = "";
+  show($("previewFrame"), false);
+  show($("previewEmpty"), true);
+  setStep(me && me.role === "viewer" ? 2 : step);
 }
 
 // Ask the server every 3 seconds until the background function has saved the result.
@@ -189,32 +226,37 @@ function poll(id) {
 
 function showConversion(c) {
   currentId = c.id;
+  show($("finalNote"), false);
   $("previewFrame").srcdoc = c.previewHtml || "";
-  show($("results"), true);
+  show($("previewFrame"), true);
+  show($("previewEmpty"), false);
   const canWork = me.role !== "viewer";
-  show($("finalise"), canWork);
+  reached = { 1: canWork, 2: true, 3: canWork };
   if (c.finalHtml) {
     $("finalHtml").value = c.finalHtml;
     $("finalFrame").srcdoc = c.finalHtml;
-    show($("final"), true);
-  } else {
-    show($("final"), false);
+    reached[4] = true;
   }
+  setStep(c.finalHtml && canWork ? 4 : 2);
 }
 
 $("zipBtn").addEventListener("click", () => { if (currentId) location.href = `/api/conversions/${currentId}/zip`; });
 
 $("finaliseBtn").addEventListener("click", async () => {
   $("finaliseBtn").disabled = true;
-  flash($("finaliseStatus"), "Matching image URLs...", 0);
+  busy($("finaliseStatus"), "Matching image URLs...");
   try {
     const r = await api(`/conversions/${currentId}/finalise`, "POST", { accordionHtml: $("accordionHtml").value });
     $("finalHtml").value = r.finalHtml;
     $("finalFrame").srcdoc = r.finalHtml;
-    show($("final"), true);
-    flash($("finaliseStatus"), r.unmatched.length
-      ? `Matched ${r.matched}. Not found in your paste: ${r.unmatched.join(", ")}`
-      : `All ${r.matched} images matched.`, 8000);
+    reached[4] = true;
+    setStep(4);
+    $("finalNote").textContent = r.unmatched.length
+      ? `Matched ${r.matched} image(s). Not found in your paste, so the file name was left in the HTML: ${r.unmatched.join(", ")}. Check that you uploaded THIS conversion's zip to Pardot and pasted its file list (a new conversion can use different file names).`
+      : `All ${r.matched} images matched.`;
+    $("finalNote").classList.toggle("warn", r.unmatched.length > 0);
+    show($("finalNote"), true);
+    $("finaliseStatus").textContent = "";
   } catch (err) {
     flash($("finaliseStatus"), err.message, 8000);
   }
@@ -225,6 +267,13 @@ $("copyBtn").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("finalHtml").value); flash($("copyStatus"), "Copied!"); }
   catch { flash($("copyStatus"), "Copy failed - select the text and copy manually."); }
 });
+
+// ---------- How-to guide popup ----------
+const howTo = $("howToDialog");
+$("howToBtn").addEventListener("click", () => { howTo.showModal(); howTo.scrollTop = 0; });
+["howToClose", "howToDone"].forEach((id) => $(id).addEventListener("click", () => howTo.close()));
+// Click on the dark area outside the box closes it too.
+howTo.addEventListener("click", (e) => { if (e.target === howTo) howTo.close(); });
 
 // ---------- History ----------
 async function loadHistory() {
@@ -250,7 +299,7 @@ $("historyBody").addEventListener("click", (e) => {
   resetResults();
   show($("convertError"), false);
   poll(btn.dataset.open);
-  $("convertStatus").textContent = "Loading...";
+  busy($("convertStatus"), "Loading...");
 });
 
 // ---------- Admin ----------
@@ -413,4 +462,6 @@ $("savePromptBtn").addEventListener("click", async () => {
   renderUser();
   applyRole();
   fillOptions();
+  reached = me.role === "viewer" ? { 2: true } : { 1: true };
+  setStep(me.role === "viewer" ? 2 : 1);
 })();
