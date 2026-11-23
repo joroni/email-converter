@@ -1,6 +1,7 @@
 // The slow Claude step. Called by the background function (up to 15 minutes allowed).
 const store = require("./store");
 const { generateEmailHtml } = require("./ai");
+const { injectFonts } = require("./fonts");
 const { DEFAULT_PROMPT } = require("./defaults");
 
 async function saveStatus(id, patch) {
@@ -29,7 +30,7 @@ async function runConversion(id) {
       imageNames: conv.images.filter((i) => i.kind === "layer").map((i) => i.name),
       source: conv.source,
     });
-    await saveStatus(id, { status: "ready", html, error: null });
+    await saveStatus(id, { status: "ready", html: injectFonts(html), error: null });
   } catch (err) {
     console.error("Conversion failed", id, err);
     await saveStatus(id, { status: "error", error: String(err.message || err).slice(0, 500) });

@@ -7,7 +7,7 @@ You are given: a screenshot of the design, simplified Figma layer data (when ava
 Requirements:
 - Output ONE complete HTML document and nothing else (no explanations, no markdown fences).
 - Table-based layout, 600px wide, centred. No flexbox, grid or external CSS. Inline styles on every element.
-- Use web-safe fallback fonts after any brand font.
+- Use the brand font stacks you are given (with their web-safe fallbacks) for every font-family; do not add @font-face rules.
 - For every image, use the exact exported file name provided as the src (for example src="newsletter-hero-01.png"). Always set alt, width, and display:block.
 - Social links: only use the social networks listed as enabled in the brand profile. Link each to its URL and use its icon file name as the image src. If an icon has no file, use a text link.
 - Footer: include the brand's footer address, a privacy policy link, and the platform's unsubscribe tag exactly as given.

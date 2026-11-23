@@ -8,6 +8,8 @@
 
 [functions]
   node_bundler = "esbuild"
+  # server/fonts.js reads this file at runtime
+  included_files = ["server/email-fonts.css"]
 
 # Send every /api/* request to the Express function.
 [[redirects]]

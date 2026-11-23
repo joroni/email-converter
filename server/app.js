@@ -2,6 +2,7 @@
 // so the same code can run on a normal server (EC2) later with app.listen().
 const express = require("express");
 const auth = require("./auth");
+const { rawCss } = require("./fonts");
 
 const app = express();
 app.set("trust proxy", true);
@@ -25,6 +26,11 @@ function wrapAsync(router) {
   });
   return router;
 }
+
+// Brand @font-face rules for the app's own pages (public: just font URLs, no secrets).
+app.get(["/api/fonts.css", "/.netlify/functions/api/fonts.css"], (req, res) => {
+  res.type("text/css").set("Cache-Control", "public, max-age=86400").send(rawCss());
+});
 
 const api = express.Router();
 api.use("/users", wrapAsync(require("./routes/users")));

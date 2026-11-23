@@ -1,0 +1,93 @@
+@font-face {
+    font-family: "AddiumMono";
+    src: url("https://addium.marketing/fonts//68adf891f628375290aed98e_ABCMonumentGroteskMono-Regular.woff2")
+        format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//68b086d439861f0734fa44a6_ABCMonumentGrotesk-Regular.otf")
+        format("opentype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//68bfa831dabe66f401b1ab55_ABCMonumentGrotesk-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//69b0be8608bd29fc9ee7787d_ABCMonumentGrotesk-Bold.woff2") format("woff2");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSerif";
+    src: url("https://addium.marketing/fonts//68adf891f628375290aed9ab_SangBleuKingdom-Regular-WebS.woff2")
+        format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//696562ca6b09689f4b54d861_ABCMonumentGrotesk-Light.woff2") format("woff2");
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//68b3a95743d87184ce4f8758_ABCMonumentGrotesk-RegularItalic.otf")
+        format("opentype");
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//68bfa831bfa810e4e9f4cd55_ABCMonumentGrotesk-MediumItalic.woff2")
+        format("woff2");
+    font-weight: 500;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//69b1431459ffdfe45e454a88_ABCMonumentGrotesk-BoldItalic.woff2")
+        format("woff2");
+    font-weight: 700;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//69b0be8608bd29fc9ee7787d_ABCMonumentGrotesk-Bold.woff2") format("woff2");
+    font-weight: 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "AddiumSans";
+    src: url("https://addium.marketing/fonts//69b0dfdb4825190e0b0c6178_ABCMonumentGrotesk-Black.woff2") format("woff2");
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}

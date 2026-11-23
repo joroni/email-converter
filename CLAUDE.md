@@ -104,7 +104,7 @@ the decisions and gotchas learned along the way, and how to rebuild it. Keep it 
 - Express is wrapped as a Netlify Function (`netlify/functions/api.js`, serverless-http). A second function,
   `netlify/functions/convert-background.js` (the `-background` suffix = 15 min limit), runs the Claude step.
 - Readable, commented code. Passwords hashed with `bcryptjs` (pure JS, no native build on Netlify).
-- Tests: `npm test` (node:test, 11 tests in `test/`). Run them before committing. jsdom is NOT a dependency; browser behaviour
+- Tests: `npm test` (node:test, 14 tests in `test/`). Run them before committing. jsdom is NOT a dependency; browser behaviour
   was checked with throw-away jsdom scripts (note: jsdom ignores iframe `srcdoc`, so write into `contentDocument` by hand).
 
 ## File map
@@ -120,9 +120,10 @@ server/figma.js              parse link, read frame, export image layers, simpli
 server/ai.js                 generateEmailHtml() = the ONLY AI call; API or local `claude -p` (AI_PROVIDER=cli)
 server/convert.js            runConversion(id): loads data, calls AI, saves html/status
 server/defaults.js           DEFAULT_PROMPT (admin can override in settings)
+server/fonts.js              injects brand @font-face rules into generated emails; server/email-fonts.css = the font source of truth
 server/platforms/            index.js registry; pardot.js, hubspot.js; common.js (URL extraction, name matching, src swapping)
 server/routes/               auth.js, users.js, settings.js, conversions.js
-test/                        api.test.js (in-memory store, roles), matching.test.js, figma.test.js (mocked Figma API)
+test/                        api.test.js (in-memory store, roles), matching.test.js, figma.test.js (mocked Figma API), fonts.test.js
 ```
 
 ## Blobs stores (server/store.js)
@@ -157,6 +158,16 @@ Conversion status: `processing` -> `ready` (html written) -> `finalised` (finalH
 - Brand social icons (enabled ones with an uploaded file) are added to the zip and referenced by file name.
 - Screenshot sent to Claude is scaled so no side exceeds ~7500 px (AI limit ~8000).
 
+## Fonts (server/fonts.js, server/email-fonts.css)
+- `server/email-fonts.css` is a verbatim copy of `Documents/Addium2026/Email Templates/style.css`: the ONLY place font URLs live.
+  To change or add fonts, replace that file (families: AddiumSans 300-900 + italics, AddiumMono, AddiumSerif, hosted on addium.marketing).
+- Claude is told (server/ai.js "## Fonts") to use the fallback stacks `FONT_STACKS` in inline font-family and NOT to write @font-face.
+- After generation, `convert.js` calls `injectFonts(html)`: adds only the faces actually used (weights found in the HTML; italics only if used)
+  in `<!--[if !mso]><!--> <style>...</style> <!--<![endif]-->` before `</head>`. Same convention as the Email Templates `CLAUDE.md`
+  (Gmail and Outlook desktop ignore web fonts and use the fallbacks). Skipped if the HTML already has @font-face.
+- Deploy: `netlify.toml` lists the css in `included_files` and `fonts.js` tries several paths. NOT yet verified on a real Netlify deploy:
+  check the first deployed conversion contains the font block (a missing file only logs a warning and emails fall back to system fonts).
+
 ## Pardot behaviour (hard-won; do not "simplify" without re-testing with a real paste)
 - Pardot rewrites hosted file names: `-` becomes `_`, and the name inside the URL is cut to about 68 characters.
 - The pasted accordion HTML has one `accordion-group` per file, each with the ORIGINAL name (`<h4 class="media-heading">name - <a`,
@@ -178,6 +189,14 @@ Conversion status: `processing` -> `ready` (html written) -> `finalised` (finalH
   Edits are serialised back into the textarea (editor-only `<style id="ec-editor-style">` is stripped). Browser serialisation may add
   `<tbody>` etc. The HTML box is also editable (preview refreshes after 500 ms). Unsaved-edit warnings on leave/new conversion.
 - Admin: users, brands (social rows with URL/on/icon upload), platform rules, Claude prompt. Mobile-friendly hamburger drawer, avatar dropdown.
+
+## UI look (public/css/style.css)
+- Deliberately NOT Bootstrap-like (no framework at all, one hand-written stylesheet). Addium brand look: warm paper background `#f6f6f4`,
+  ink `#373328`, accent green `#c3e2a3`, pill buttons and segmented pill toggles, soft 16px cards, small uppercase mono labels
+  (AddiumMono) and AddiumSans for text. Colours/fonts are CSS variables at the top of the file.
+- The app's pages load the brand fonts from `/api/fonts.css`, a route in `server/app.js` that serves `server/email-fonts.css`
+  (the same single font source the generated emails use). The font host sends `access-control-allow-origin: *`, so cross-origin loading works.
+- Verified by rendering the real pages in headless Chrome (puppeteer-core + a stub API) and viewing screenshots.
 
 ## Security notes
 - Secrets only in server env vars; browser never sees them. Cookie is HttpOnly + SameSite=Lax (+ Secure on https). User re-loaded

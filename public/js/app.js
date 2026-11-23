@@ -74,7 +74,7 @@ $("closeMenuBtn").addEventListener("click", () => setMenu(false));
 $("overlay").addEventListener("click", () => setMenu(false));
 
 // Avatar: round image made from the user's initials (swap for an uploaded photo later).
-const AVATAR_COLORS = { admin: "#1f6feb", editor: "#1e8e5a", viewer: "#8a5cf6" };
+const AVATAR_COLORS = { admin: "#373328", editor: "#4f7a2e", viewer: "#8a7650" }; // brand-toned; white initials stay readable
 function avatarUrl(name, color) {
   const initials = name.slice(0, 2).toUpperCase();
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${color}"/>` +

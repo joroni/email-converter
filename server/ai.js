@@ -9,6 +9,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { FONT_STACKS } = require("./fonts");
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
 const MAX_FRAME_CHARS = 150000;
@@ -18,6 +19,11 @@ function buildContext({ brand, platform, notes, whiteBody, frameData, imageNames
   const parts = [];
   parts.push("## Brand profile\n" + JSON.stringify(brand, null, 2));
   parts.push("## Platform rules\n" + JSON.stringify(platform, null, 2));
+  parts.push("## Fonts\nUse these brand font stacks in inline font-family declarations (copy them exactly):\n" +
+    `- Sans (ABC Monument Grotesk, the main font): ${FONT_STACKS.AddiumSans}  - weights 400, 500, 700\n` +
+    `- Mono (ABC Monument Grotesk Mono, uppercase eyebrows/captions): ${FONT_STACKS.AddiumMono}\n` +
+    `- Serif (Sang Bleu, only if the design clearly uses a serif): ${FONT_STACKS.AddiumSerif}\n` +
+    "Map the Figma font names to these stacks. Do NOT write @font-face rules or <link> tags: they are added automatically after you finish.");
   parts.push("## Page background\n" + (whiteBody
     ? "WHITE PAGE: the outer page/body must be white (#ffffff) - set bgcolor and background-color on <body> and on the outer 100%-width table to white. Apply any background colour from the design ONLY to the 600px content wrapper table (or the individual sections inside it), never to the body or the outer table."
     : "Apply the design's page background colour to the <body> and the outer 100%-width table (bgcolor + background-color), with the 600px content wrapper on top."));
