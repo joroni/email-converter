@@ -652,6 +652,8 @@ $("savePromptBtn").addEventListener("click", async () => {
   renderUser();
   applyRole();
   fillOptions();
+  $("appVersion").textContent = "v" + config.version;
+  $("appVersionText").textContent = config.version;
   reached = me.role === "viewer" ? { 2: true } : { 1: true };
   setStep(me.role === "viewer" ? 2 : 1);
 })();

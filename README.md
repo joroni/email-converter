@@ -82,3 +82,7 @@ Copy `server/platforms/hubspot.js`, set its id, default tags and how to find hos
 
 ---
 Vibe coded by: Raymund Niconi
+
+## Versioning
+
+Version lives in `package.json` (semantic versioning) and shows on the About page. Bump it with `npm version patch|minor|major --no-git-tag-version` for every update.

@@ -228,6 +228,11 @@ background function 15 min; 40 image layers per email; PNG uploads have no layer
 8. README, `.env.example` (blanks), `.gitignore` (`.env`, `node_modules`, `.netlify`). Then re-apply the lessons in this section
 (flattened images, Pardot pairing, sandboxed previews, consistency flag, `--offline`).
 
+## Versioning and About page
+- `package.json` `version` is the single source of truth (semantic versioning). `/api/config` returns it and the About page (`#view-about`, sidebar button next to Admin settings) shows it.
+- Bump it on EVERY update with `npm version patch|minor|major --no-git-tag-version` (patch = fix, minor = new feature, major = breaking change), in the same commit as the change.
+- The "Vibe coded by" credit lives on the About page (and the login page), not in the app footer.
+
 ## Future / ideas
 HubSpot support (revisit file naming and finalise parsing); per-platform How-to popup; optional live HTML button below flattened
 hero images (needs a layer-name convention); compress very large exports; deploy to Netlify once `ANTHROPIC_API_KEY` is available.

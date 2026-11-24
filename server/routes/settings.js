@@ -18,6 +18,7 @@ router.get("/config", auth.requireRole(), async (req, res) => {
   const brands = await getBrands();
   const rules = await platforms.getAllRules();
   res.json({
+    version: require("../../package.json").version, // shown on the About page
     brands: brands.map((b) => b.name),
     platforms: Object.entries(rules).map(([id, p]) => ({ id, label: p.label, enabled: p.enabled })),
   });

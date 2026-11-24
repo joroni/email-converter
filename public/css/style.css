@@ -197,3 +197,9 @@ dialog.link-dialog { width: min(480px, calc(100vw - 32px)); }
 
 /* ---------- Small credit line ---------- */
 .credit { text-align: center; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #a9a597; opacity: .8; padding: 28px 0 16px; }
+
+/* ---------- About page ---------- */
+#view-about h3 { margin: 22px 0 6px; font-size: 16px; }
+#view-about p, #view-about li { line-height: 1.55; }
+.about-steps { padding-left: 20px; display: grid; gap: 8px; }
+.credit-line { margin-top: 28px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }

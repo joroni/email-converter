@@ -48,6 +48,7 @@
     <button data-view="converter" class="active">Converter</button>
     <button data-view="history">History</button>
     <button data-view="admin" data-role="admin">Admin settings</button>
+    <button data-view="about">About</button>
   </nav>
 </aside>
 
@@ -245,8 +246,34 @@
   </div>
 </section>
 
+<!-- ===================== ABOUT ===================== -->
+<section id="view-about" class="view">
+  <div class="card">
+    <div class="card-head"><h2>About Email Converter</h2><span class="badge ok" id="appVersion">v&hellip;</span></div>
+
+    <h3>Purpose</h3>
+    <p>Email Converter turns a finished email design into marketing email HTML that is ready to send. Designers hand over a Figma frame (or a PNG export); this tool produces the table-based, inline-styled, 600px-wide HTML that Pardot needs, with the right brand footer, social links and unsubscribe tag. It saves the slow, repetitive step of hand-coding each email.</p>
+
+    <h3>How it works</h3>
+    <ol class="about-steps">
+      <li><strong>Setup.</strong> Name the email, paste a Figma frame link (or upload a PNG), choose the brand and platform, and add notes if there is anything one-off. Press Convert.</li>
+      <li><strong>Preview.</strong> The app reads the design, exports image layers as 2x PNGs and asks Claude to write the HTML. A preview appears when it is ready, along with a zip of the images.</li>
+      <li><strong>Image links.</strong> Upload the zip images to Pardot Files, then paste the Files accordion HTML back into the app. It matches each hosted image to the original by file name.</li>
+      <li><strong>Final HTML.</strong> The finished HTML has the hosted image URLs swapped in. Add or edit links right in the preview, then copy the HTML into Pardot.</li>
+    </ol>
+
+    <h3>Roles</h3>
+    <p><strong>Admin</strong> manages users, brands, platform rules and the Claude prompt. <strong>Editor</strong> runs conversions and sees their own history. <strong>Viewer</strong> can only view finished conversions.</p>
+
+    <h3>Version</h3>
+    <p>This is version <strong id="appVersionText">&hellip;</strong>. The number follows semantic versioning (major.minor.patch): patch for fixes, minor for new features, major for breaking changes.</p>
+
+    <p class="credit-line">Vibe coded by: Raymund Niconi</p>
+  </div>
+</section>
+
 </main>
-<footer class="credit">Vibe coded by: Raymund Niconi</footer>
+
 
 
 <!-- How-to guide popup (opened from step 3) -->
